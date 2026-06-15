@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_text_field.dart';
 import 'criar_conta_screen.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -27,6 +28,12 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       await _authService.signIn(_emailController.text, _senhaController.text);
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (_) => false,
+      );
     } on FirebaseAuthException catch (e) {
       final message = switch (e.code) {
         'user-not-found' ||
@@ -35,6 +42,12 @@ class _LoginScreenState extends State<LoginScreen> {
         _ => 'Nao foi possivel entrar. Tente novamente.',
       };
       _showMessage(message);
+    } on FirebaseException catch (e) {
+      _showMessage(
+        'Login autenticado, mas nao foi possivel carregar seu perfil: ${e.message ?? e.code}',
+      );
+    } catch (e) {
+      _showMessage('Nao foi possivel entrar. $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -68,11 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.network(
-            'https://images.unsplash.com/photo-1518605368461-1ee7e5376cb1?q=80&w=1200',
-            fit: BoxFit.cover,
-          ),
-          Container(color: Colors.black.withValues(alpha: 0.48)),
+          const _LoginBackground(),
           SafeArea(
             child: Column(
               children: [
@@ -188,4 +197,100 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+class _LoginBackground extends StatelessWidget {
+  const _LoginBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _LoginBackgroundPainter(),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.primary,
+              AppColors.primary.withValues(alpha: 0.92),
+              const Color(0xFF163B2C),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LoginBackgroundPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    final glowPaint = Paint()
+      ..color = AppColors.accent.withValues(alpha: 0.12)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(
+      Offset(size.width * 0.1, size.height * 0.16),
+      size.width * 0.34,
+      glowPaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.9, size.height * 0.32),
+      size.width * 0.4,
+      glowPaint,
+    );
+
+    final top = size.height * 0.08;
+    final bottom = size.height * 0.64;
+    final left = size.width * 0.08;
+    final right = size.width * 0.92;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTRB(left, top, right, bottom),
+        const Radius.circular(18),
+      ),
+      linePaint,
+    );
+    canvas.drawLine(
+      Offset(size.width / 2, top),
+      Offset(size.width / 2, bottom),
+      linePaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width / 2, (top + bottom) / 2),
+      size.width * 0.13,
+      linePaint,
+    );
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: Offset(size.width / 2, top),
+        width: size.width * 0.36,
+        height: size.width * 0.18,
+      ),
+      0,
+      3.14,
+      false,
+      linePaint,
+    );
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: Offset(size.width / 2, bottom),
+        width: size.width * 0.36,
+        height: size.width * 0.18,
+      ),
+      3.14,
+      3.14,
+      false,
+      linePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

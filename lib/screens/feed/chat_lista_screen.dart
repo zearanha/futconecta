@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../repositories/chat_repository.dart';
+import '../../theme/app_theme.dart';
 import '../chat/chat_screen.dart';
 
 class ChatListaScreen extends StatelessWidget {
@@ -19,59 +20,166 @@ class ChatListaScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Mensagens')),
-      body: StreamBuilder(
+      body: StreamBuilder<List<ChatConversation>>(
         stream: repository.watchConversations(user.uid),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (snapshot.hasError) {
+            return _ChatError(error: snapshot.error);
+          }
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final docs = snapshot.data!.docs;
-          final seen = <String>{};
-          final conversations = docs.where((doc) {
-            final data = doc.data();
-            final participants = List<String>.from(data['participants'] ?? []);
-            final other = participants.firstWhere(
-              (id) => id != user.uid,
-              orElse: () => '',
-            );
-            if (other.isEmpty || seen.contains(other)) return false;
-            seen.add(other);
-            return true;
-          }).toList();
 
+          final conversations = snapshot.data ?? const <ChatConversation>[];
           if (conversations.isEmpty) {
-            return const Center(child: Text('Nenhuma conversa ainda.'));
+            return const _EmptyConversations();
           }
 
           return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             itemCount: conversations.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
-              final data = conversations[index].data();
-              final participants = List<String>.from(
-                data['participants'] ?? [],
-              );
-              final other = participants.firstWhere((id) => id != user.uid);
-              return ListTile(
-                leading: const CircleAvatar(child: Icon(Icons.person)),
-                title: Text('Conversa com $other'),
-                subtitle: Text(
-                  data['texto'] ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        ChatScreen(receiverId: other, receiverName: other),
-                  ),
-                ),
+              final conversation = conversations[index];
+              final otherId = conversation.otherUserId(user.uid);
+              final otherName = conversation.otherUserName(user.uid);
+              return _ConversationTile(
+                conversation: conversation,
+                currentUserId: user.uid,
+                otherName: otherName,
+                onTap: otherId.isEmpty
+                    ? null
+                    : () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatScreen(
+                            receiverId: otherId,
+                            receiverName: otherName,
+                          ),
+                        ),
+                      ),
               );
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class _ConversationTile extends StatelessWidget {
+  const _ConversationTile({
+    required this.conversation,
+    required this.currentUserId,
+    required this.otherName,
+    required this.onTap,
+  });
+
+  final ChatConversation conversation;
+  final String currentUserId;
+  final String otherName;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final mine = conversation.lastSenderId == currentUserId;
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              const CircleAvatar(
+                backgroundColor: AppColors.primaryLight,
+                child: Icon(Icons.person, color: AppColors.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      otherName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.text,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${mine ? 'Voce: ' : ''}${conversation.lastMessage}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: AppColors.muted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyConversations extends StatelessWidget {
+  const _EmptyConversations();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 54, color: AppColors.muted),
+            SizedBox(height: 12),
+            Text(
+              'Nenhuma conversa ainda.',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Abra o perfil de um jogador e toque em Chat interno para iniciar.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatError extends StatelessWidget {
+  const _ChatError({required this.error});
+
+  final Object? error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Nao foi possivel carregar as mensagens.\n$error',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: AppColors.muted),
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../models/player.dart';
 import '../../repositories/favorites_repository.dart';
 import '../../repositories/player_repository.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/player_card.dart';
 import '../perfil/perfil_jogador_screen.dart';
 
@@ -51,6 +52,19 @@ class _BuscaJogadoresScreenState extends State<BuscaJogadoresScreen> {
     peDominante: _peDominante,
   );
 
+  void _clearFilters() {
+    setState(() {
+      _queryController.clear();
+      _cidadeController.clear();
+      _estadoController.clear();
+      _idadeMinController.clear();
+      _idadeMaxController.clear();
+      _alturaController.clear();
+      _posicao = null;
+      _peDominante = null;
+    });
+  }
+
   @override
   void dispose() {
     _queryController.dispose();
@@ -66,57 +80,33 @@ class _BuscaJogadoresScreenState extends State<BuscaJogadoresScreen> {
   Widget build(BuildContext context) {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     return Scaffold(
-      appBar: AppBar(title: const Text('Busca de jogadores')),
+      appBar: AppBar(
+        title: const Text('Busca avancada'),
+        actions: [
+          IconButton(
+            tooltip: 'Limpar filtros',
+            icon: const Icon(Icons.refresh),
+            onPressed: _clearFilters,
+          ),
+        ],
+      ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          TextField(
-            controller: _queryController,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              hintText: 'Nome, cidade, clube ou posicao',
-              prefixIcon: Icon(Icons.search),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _DropFilter(
-                label: 'Posicao',
-                value: _posicao,
-                values: _posicoes,
-                onChanged: (value) => setState(() => _posicao = value),
-              ),
-              _DropFilter(
-                label: 'Pe dominante',
-                value: _peDominante,
-                values: _pes,
-                onChanged: (value) => setState(() => _peDominante = value),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _smallField(_idadeMinController, 'Idade min')),
-              const SizedBox(width: 8),
-              Expanded(child: _smallField(_idadeMaxController, 'Idade max')),
-              const SizedBox(width: 8),
-              Expanded(child: _smallField(_alturaController, 'Altura min')),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _smallField(_cidadeController, 'Cidade')),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 96,
-                child: _smallField(_estadoController, 'Estado'),
-              ),
-            ],
+          _SearchPanel(
+            queryController: _queryController,
+            cidadeController: _cidadeController,
+            estadoController: _estadoController,
+            idadeMinController: _idadeMinController,
+            idadeMaxController: _idadeMaxController,
+            alturaController: _alturaController,
+            posicao: _posicao,
+            peDominante: _peDominante,
+            posicoes: _posicoes,
+            pes: _pes,
+            onChanged: () => setState(() {}),
+            onPosicaoChanged: (value) => setState(() => _posicao = value),
+            onPeChanged: (value) => setState(() => _peDominante = value),
           ),
           const SizedBox(height: 18),
           StreamBuilder<List<Player>>(
@@ -135,33 +125,35 @@ class _BuscaJogadoresScreenState extends State<BuscaJogadoresScreen> {
                 builder: (context, favoritesSnapshot) {
                   final favorites = favoritesSnapshot.data ?? <String>{};
                   if (players.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.only(top: 60),
-                      child: Center(child: Text('Nenhum jogador encontrado.')),
-                    );
+                    return const _NoResults();
                   }
                   return Column(
-                    children: players.map((player) {
-                      final isFavorite = favorites.contains(player.id);
-                      return PlayerCard(
-                        player: player,
-                        isFavorite: isFavorite,
-                        onFavorite: currentUserId == null
-                            ? null
-                            : () => _favoritesRepository.toggleFavorite(
-                                clubId: currentUserId,
-                                playerId: player.id,
-                                isFavorite: isFavorite,
-                              ),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                PerfilJogadorScreen(playerId: player.id),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _ResultsHeader(count: players.length),
+                      const SizedBox(height: 10),
+                      ...players.map((player) {
+                        final isFavorite = favorites.contains(player.id);
+                        return PlayerCard(
+                          player: player,
+                          isFavorite: isFavorite,
+                          onFavorite: currentUserId == null
+                              ? null
+                              : () => _favoritesRepository.toggleFavorite(
+                                  clubId: currentUserId,
+                                  playerId: player.id,
+                                  isFavorite: isFavorite,
+                                ),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  PerfilJogadorScreen(playerId: player.id),
+                            ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }),
+                    ],
                   );
                 },
               );
@@ -171,12 +163,188 @@ class _BuscaJogadoresScreenState extends State<BuscaJogadoresScreen> {
       ),
     );
   }
+}
 
-  Widget _smallField(TextEditingController controller, String label) {
+class _SearchPanel extends StatelessWidget {
+  const _SearchPanel({
+    required this.queryController,
+    required this.cidadeController,
+    required this.estadoController,
+    required this.idadeMinController,
+    required this.idadeMaxController,
+    required this.alturaController,
+    required this.posicao,
+    required this.peDominante,
+    required this.posicoes,
+    required this.pes,
+    required this.onChanged,
+    required this.onPosicaoChanged,
+    required this.onPeChanged,
+  });
+
+  final TextEditingController queryController;
+  final TextEditingController cidadeController;
+  final TextEditingController estadoController;
+  final TextEditingController idadeMinController;
+  final TextEditingController idadeMaxController;
+  final TextEditingController alturaController;
+  final String? posicao;
+  final String? peDominante;
+  final List<String> posicoes;
+  final List<String> pes;
+  final VoidCallback onChanged;
+  final ValueChanged<String?> onPosicaoChanged;
+  final ValueChanged<String?> onPeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Critérios de prospecção',
+            style: TextStyle(
+              color: AppColors.text,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Combine posição, localização e perfil físico para reduzir a lista.',
+            style: TextStyle(color: AppColors.muted),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: queryController,
+            onChanged: (_) => onChanged(),
+            decoration: const InputDecoration(
+              hintText: 'Nome, cidade, clube ou posicao',
+              prefixIcon: Icon(Icons.search),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _DropFilter(
+                label: 'Posicao',
+                value: posicao,
+                values: posicoes,
+                onChanged: onPosicaoChanged,
+              ),
+              _DropFilter(
+                label: 'Pe dominante',
+                value: peDominante,
+                values: pes,
+                onChanged: onPeChanged,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _SmallField(idadeMinController, 'Idade min', onChanged),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _SmallField(idadeMaxController, 'Idade max', onChanged),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _SmallField(alturaController, 'Altura min', onChanged),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _SmallField(cidadeController, 'Cidade', onChanged),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 96,
+                child: _SmallField(estadoController, 'UF', onChanged),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallField extends StatelessWidget {
+  const _SmallField(this.controller, this.label, this.onChanged);
+
+  final TextEditingController controller;
+  final String label;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      onChanged: (_) => setState(() {}),
+      onChanged: (_) => onChanged(),
       decoration: InputDecoration(labelText: label),
+    );
+  }
+}
+
+class _ResultsHeader extends StatelessWidget {
+  const _ResultsHeader({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(
+          child: Text(
+            'Resultados',
+            style: TextStyle(
+              color: AppColors.text,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        Text(
+          '$count atletas',
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NoResults extends StatelessWidget {
+  const _NoResults();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(top: 60),
+      child: Center(
+        child: Text(
+          'Nenhum jogador encontrado com esses filtros.',
+          textAlign: TextAlign.center,
+        ),
+      ),
     );
   }
 }

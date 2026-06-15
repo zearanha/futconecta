@@ -14,11 +14,12 @@ class AuthService {
   Stream<User?> get authStateChanges => _auth.authStateChanges();
   User? get currentUser => _auth.currentUser;
 
-  Future<void> signIn(String email, String password) async {
-    await _auth.signInWithEmailAndPassword(
+  Future<AppUser> signIn(String email, String password) async {
+    final credential = await _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password.trim(),
     );
+    return _getOrRepairAppUser(credential.user!);
   }
 
   Future<AppUser> createAccount({
@@ -76,9 +77,40 @@ class AuthService {
   Future<AppUser?> getCurrentAppUser() async {
     final user = _auth.currentUser;
     if (user == null) return null;
+    return _getOrRepairAppUser(user);
+  }
+
+  Future<AppUser> _getOrRepairAppUser(User user) async {
     final doc = await _firestore.collection('users').doc(user.uid).get();
-    if (!doc.exists) return null;
-    return AppUser.fromDoc(doc);
+    if (doc.exists) return AppUser.fromDoc(doc);
+
+    final playerDoc = await _firestore
+        .collection('players')
+        .doc(user.uid)
+        .get();
+    final playerData = playerDoc.data();
+    final repairedUser = AppUser(
+      id: user.uid,
+      tipoUsuario: playerDoc.exists
+          ? UserType.jogador
+          : UserType.clubeTreinadorOlheiro,
+      nome:
+          playerData?['nome'] ??
+          user.displayName ??
+          user.email?.split('@').first ??
+          'Usuario',
+      email: user.email ?? '',
+      cidade: playerData?['cidade'] ?? '',
+      estado: playerData?['estado'] ?? '',
+    );
+
+    await _firestore.collection('users').doc(user.uid).set({
+      ...repairedUser.toMap(),
+      'createdAt': FieldValue.serverTimestamp(),
+      'repairedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    return repairedUser;
   }
 
   Future<void> sendPasswordReset(String email) async {

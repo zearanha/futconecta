@@ -21,7 +21,7 @@ class SettingsScreen extends StatelessWidget {
             leading: Icon(Icons.dataset_outlined),
             title: Text('Colecoes'),
             subtitle: Text(
-              'users, players, videos, favorites, reviews e messages.',
+              'users, players, feedPosts, videos, favorites, reviews e chats.',
             ),
           ),
           ListTile(

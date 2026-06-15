@@ -1,1 +1,29 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"futconecta","appId":"1:379214372274:android:e3ad16197d0b8829cd98ab","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"futconecta","configurations":{"android":"1:379214372274:android:e3ad16197d0b8829cd98ab","ios":"1:379214372274:ios:b7419e4d05505b2ccd98ab","macos":"1:379214372274:ios:b7419e4d05505b2ccd98ab","web":"1:379214372274:web:f87c4d54737c26f7cd98ab","windows":"1:379214372274:web:b413c1e353ea374bcd98ab"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "futconecta",
+          "appId": "1:379214372274:android:e3ad16197d0b8829cd98ab",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "futconecta",
+          "configurations": {
+            "android": "1:379214372274:android:e3ad16197d0b8829cd98ab",
+            "ios": "1:379214372274:ios:b7419e4d05505b2ccd98ab",
+            "macos": "1:379214372274:ios:b7419e4d05505b2ccd98ab",
+            "web": "1:379214372274:web:f87c4d54737c26f7cd98ab",
+            "windows": "1:379214372274:web:b413c1e353ea374bcd98ab"
+          }
+        }
+      }
+    }
+  }
+}

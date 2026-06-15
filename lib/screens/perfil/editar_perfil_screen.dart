@@ -2,8 +2,6 @@ import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../models/player.dart';
@@ -41,7 +39,6 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   final _amarelos = TextEditingController();
   final _vermelhos = TextEditingController();
 
-<<<<<<< HEAD
   String? _posicaoPrincipal;
   String? _posicaoSecundaria;
   String? _peDominante;
@@ -49,110 +46,6 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   File? _foto;
   bool _loaded = false;
   bool _saving = false;
-=======
-  @override
-  void initState() {
-    super.initState();
-    _carregarPerfil();
-  }
-
-  Future<void> _carregarPerfil() async {
-    final usuario = FirebaseAuth.instance.currentUser;
-    if (usuario == null) return;
-
-    final documento = await FirebaseFirestore.instance
-        .collection('jogadores')
-        .doc(usuario.uid)
-        .get();
-    final perfil = documento.data();
-    if (perfil == null || !mounted) return;
-
-    setState(() {
-      _nomeController.text = _valor(perfil['nome']);
-      _idadeController.text = _valor(perfil['idade']);
-      _cidadeController.text = _valor(perfil['cidade']);
-      _telefoneController.text = _valor(perfil['telefone']);
-      _emailController.text = _valor(perfil['email']);
-      _biografiaController.text = _valor(perfil['biografia']);
-      _alturaController.text = _valor(perfil['altura']);
-      _pesoController.text = _valor(perfil['peso']);
-      _clubeAtualController.text = _valor(perfil['clubeAtual']);
-      _experienciaController.text = _valor(perfil['experiencia']);
-      _partidasController.text = _valor(perfil['partidas']);
-      _golsController.text = _valor(perfil['gols']);
-      _assistenciasController.text = _valor(perfil['assistencias']);
-      _posicaoSelecionada = _opcaoValida(_posicoes, perfil['posicao']);
-      _posicaoSecundariaSelecionada = _opcaoValida(
-        _posicoes,
-        perfil['posicaoSecundaria'],
-      );
-      _peDominanteSelecionado = _opcaoValida(
-        _pesDominantes,
-        perfil['peDominante'],
-      );
-    });
-  }
-
-  String _valor(dynamic valor) => (valor ?? '').toString();
-
-  String? _opcaoValida(List<String> opcoes, dynamic valor) {
-    final texto = _valor(valor);
-    return opcoes.contains(texto) ? texto : null;
-  }
-
-  Future<void> _salvarPerfil() async {
-    final usuario = FirebaseAuth.instance.currentUser;
-    if (usuario == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Faça login para salvar o perfil.')),
-      );
-      return;
-    }
-
-    await FirebaseFirestore.instance.collection('jogadores').doc(usuario.uid).set({
-      'nome': _nomeController.text.trim(),
-      'idade': _idadeController.text.trim(),
-      'cidade': _cidadeController.text.trim(),
-      'telefone': _telefoneController.text.trim(),
-      'email': _emailController.text.trim(),
-      'biografia': _biografiaController.text.trim(),
-      'altura': _alturaController.text.trim(),
-      'peso': _pesoController.text.trim(),
-      'posicao': _posicaoSelecionada,
-      'posicaoSecundaria': _posicaoSecundariaSelecionada,
-      'peDominante': _peDominanteSelecionado,
-      'clubeAtual': _clubeAtualController.text.trim(),
-      'experiencia': _experienciaController.text.trim(),
-      'partidas': _partidasController.text.trim(),
-      'gols': _golsController.text.trim(),
-      'assistencias': _assistenciasController.text.trim(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Perfil atualizado com sucesso!')),
-    );
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-      (route) => false,
-    );
-  }
-
-  // Função para abrir a galeria e escolher uma foto
-  Future<void> _escolherFoto() async {
-    final XFile? fotoSelecionada = await _picker.pickImage(
-      source: ImageSource.gallery,
-    );
-    if (fotoSelecionada != null) {
-      setState(() {
-        _imageFile = File(fotoSelecionada.path);
-      });
-    }
-  }
->>>>>>> 86bafc2ad73c7fca6b4ac07ce7c58fcbfa02ed49
 
   static const _posicoes = [
     'Goleiro',
@@ -164,17 +57,24 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   ];
   static const _pes = ['Direito', 'Esquerdo', 'Ambos'];
 
-<<<<<<< HEAD
-  String get _playerId =>
-      widget.playerId ?? FirebaseAuth.instance.currentUser!.uid;
+  String? get _playerId =>
+      widget.playerId ?? FirebaseAuth.instance.currentUser?.uid;
 
   Future<void> _load() async {
     if (_loaded) return;
-    final player = await _repository.getPlayer(_playerId);
+
+    final playerId = _playerId;
+    if (playerId == null) {
+      _loaded = true;
+      return;
+    }
+
+    final player = await _repository.getPlayer(playerId);
     if (player == null) {
       _loaded = true;
       return;
     }
+
     _nome.text = player.nome;
     _idade.text = player.idade == 0 ? '' : '${player.idade}';
     _cidade.text = player.cidade;
@@ -189,81 +89,62 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
     _assistencias.text = '${player.stats.assistencias}';
     _amarelos.text = '${player.stats.cartoesAmarelos}';
     _vermelhos.text = '${player.stats.cartoesVermelhos}';
-    _posicaoPrincipal = player.posicaoPrincipal.isEmpty
-        ? null
-        : player.posicaoPrincipal;
-    _posicaoSecundaria = player.posicaoSecundaria.isEmpty
-        ? null
-        : player.posicaoSecundaria;
-    _peDominante = player.peDominante.isEmpty ? null : player.peDominante;
+    _posicaoPrincipal = _validOption(_posicoes, player.posicaoPrincipal);
+    _posicaoSecundaria = _validOption(_posicoes, player.posicaoSecundaria);
+    _peDominante = _validOption(_pes, player.peDominante);
     _fotoUrl = player.fotoUrl;
     _loaded = true;
-=======
-  @override
-  void dispose() {
-    _nomeController.dispose();
-    _idadeController.dispose();
-    _cidadeController.dispose();
-    _telefoneController.dispose();
-    _emailController.dispose();
-    _biografiaController.dispose();
-    _alturaController.dispose();
-    _pesoController.dispose();
-    _clubeAtualController.dispose();
-    _experienciaController.dispose();
-    _partidasController.dispose();
-    _golsController.dispose();
-    _assistenciasController.dispose();
-    super.dispose();
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 24.0, bottom: 16.0),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Color(0xFF1E3A2F),
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-        ),
-      ),
-    );
->>>>>>> 86bafc2ad73c7fca6b4ac07ce7c58fcbfa02ed49
+  String? _validOption(List<String> options, String value) {
+    return options.contains(value) ? value : null;
   }
 
   Future<void> _pickPhoto() async {
     final image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) setState(() => _foto = File(image.path));
-  }
-
-  Future<void> _pickVideo() async {
-    final video = await _picker.pickVideo(source: ImageSource.gallery);
-    if (video == null) return;
-    final url = await _storage.uploadPlayerVideo(_playerId, File(video.path));
-    await _repository.addVideo(
-      playerId: _playerId,
-      videoUrl: url,
-      titulo: 'Video de desempenho',
-    );
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Video enviado com sucesso.')),
-      );
+    if (image != null && mounted) {
+      setState(() => _foto = File(image.path));
     }
   }
 
+  Future<void> _pickVideo() async {
+    final playerId = _playerId;
+    if (playerId == null) {
+      _showMessage('Faca login para enviar videos.');
+      return;
+    }
+
+    final video = await _picker.pickVideo(source: ImageSource.gallery);
+    if (video == null) return;
+
+    final url = await _storage.uploadPlayerVideo(playerId, File(video.path));
+    await _repository.addVideo(
+      playerId: playerId,
+      videoUrl: url,
+      titulo: 'Video de desempenho',
+    );
+
+    _showMessage('Video enviado com sucesso.');
+  }
+
   Future<void> _save() async {
+    final playerId = _playerId;
+    if (playerId == null) {
+      _showMessage('Faca login para salvar o perfil.');
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       var photoUrl = _fotoUrl;
       if (_foto != null) {
-        photoUrl = await _storage.uploadProfilePhoto(_playerId, _foto!);
+        photoUrl = await _storage.uploadProfilePhoto(playerId, _foto!);
       }
+
       final existing =
-          await _repository.getPlayer(_playerId) ?? Player.empty(_playerId);
+          await _repository.getPlayer(playerId) ?? Player.empty(playerId);
       final player = Player(
-        id: _playerId,
+        id: playerId,
         userId: existing.userId,
         nome: _nome.text.trim(),
         idade: int.tryParse(_idade.text) ?? 0,
@@ -288,11 +169,19 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
         mediaAvaliacoes: existing.mediaAvaliacoes,
         totalAvaliacoes: existing.totalAvaliacoes,
       );
+
       await _repository.savePlayer(player);
       if (mounted) Navigator.pop(context);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -328,6 +217,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
             body: Center(child: CircularProgressIndicator()),
           );
         }
+
         return Scaffold(
           appBar: AppBar(title: const Text('Editar perfil')),
           body: ListView(
@@ -367,7 +257,6 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                       label: 'WhatsApp',
                     ),
                   ),
-<<<<<<< HEAD
                 ],
               ),
               const SizedBox(height: 10),
@@ -468,26 +357,6 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-=======
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: SizedBox(
-                    height: 55,
-                    child: ElevatedButton(
-                      onPressed: _salvarPerfil,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF388E3C),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Salvar',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
->>>>>>> 86bafc2ad73c7fca6b4ac07ce7c58fcbfa02ed49
                           color: Colors.white,
                           strokeWidth: 2,
                         ),
