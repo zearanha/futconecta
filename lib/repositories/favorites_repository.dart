@@ -93,6 +93,28 @@ class FavoritesRepository {
     ).map((entries) => entries.map((entry) => entry.playerId).toSet());
   }
 
+  Stream<bool> watchIsFavorite({
+    required String clubId,
+    required String playerId,
+  }) {
+    return _firestore
+        .collection('favorites')
+        .doc(_favoriteId(clubId, playerId))
+        .snapshots()
+        .map((snapshot) => snapshot.exists);
+  }
+
+  Future<bool> isFavorite({
+    required String clubId,
+    required String playerId,
+  }) async {
+    final doc = await _firestore
+        .collection('favorites')
+        .doc(_favoriteId(clubId, playerId))
+        .get();
+    return doc.exists;
+  }
+
   Future<void> toggleFavorite({
     required String clubId,
     required String playerId,

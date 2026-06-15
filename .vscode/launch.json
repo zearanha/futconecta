@@ -1,0 +1,40 @@
+{
+    // Use o IntelliSense para saber mais sobre os atributos possíveis.
+    // Focalizar para exibir as descrições dos atributos existentes.
+    // Para obter mais informações, acesse: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "futconecta",
+            "request": "launch",
+            "type": "dart",
+            "toolArgs": [
+                "--dart-define=CLOUDINARY_CLOUD_NAME=dcj2towtq",
+                "--dart-define=CLOUDINARY_UPLOAD_PRESET=futconecta_unsigned",
+                "--dart-define=CLOUDINARY_FOLDER=futconecta"
+            ]
+        },
+        {
+            "name": "futconecta (profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "toolArgs": [
+                "--dart-define=CLOUDINARY_CLOUD_NAME=dcj2towtq",
+                "--dart-define=CLOUDINARY_UPLOAD_PRESET=futconecta_unsigned",
+                "--dart-define=CLOUDINARY_FOLDER=futconecta"
+            ]
+        },
+        {
+            "name": "futconecta (release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "toolArgs": [
+                "--dart-define=CLOUDINARY_CLOUD_NAME=dcj2towtq",
+                "--dart-define=CLOUDINARY_UPLOAD_PRESET=futconecta_unsigned",
+                "--dart-define=CLOUDINARY_FOLDER=futconecta"
+            ]
+        }
+    ]
+}

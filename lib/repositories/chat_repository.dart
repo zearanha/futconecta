@@ -7,6 +7,7 @@ class ChatConversation {
     required this.participantNames,
     required this.lastMessage,
     required this.lastSenderId,
+    required this.blockedBy,
     required this.updatedAt,
   });
 
@@ -15,6 +16,7 @@ class ChatConversation {
   final Map<String, String> participantNames;
   final String lastMessage;
   final String lastSenderId;
+  final List<String> blockedBy;
   final DateTime? updatedAt;
 
   factory ChatConversation.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -28,8 +30,17 @@ class ChatConversation {
       ),
       lastMessage: data['lastMessage'] ?? '',
       lastSenderId: data['lastSenderId'] ?? '',
+      blockedBy: List<String>.from(data['blockedBy'] ?? []),
       updatedAt: _toDate(data['updatedAt']),
     );
+  }
+
+  bool isBlockedFor(String userId) {
+    return blockedBy.isNotEmpty;
+  }
+
+  bool blockedByUser(String userId) {
+    return blockedBy.contains(userId);
   }
 
   String otherUserId(String currentUserId) {
@@ -98,6 +109,45 @@ class ChatRepository {
         .map((snapshot) => snapshot.docs.map(ChatMessage.fromDoc).toList());
   }
 
+  Stream<ChatConversation?> watchConversation({
+    required String currentUserId,
+    required String receiverId,
+  }) {
+    final chatId = conversationId(currentUserId, receiverId);
+    return _firestore.collection('chats').doc(chatId).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return ChatConversation.fromDoc(doc);
+    });
+  }
+
+  Future<ChatConversation?> getConversation({
+    required String currentUserId,
+    required String receiverId,
+  }) async {
+    final chatId = conversationId(currentUserId, receiverId);
+    final doc = await _firestore.collection('chats').doc(chatId).get();
+    if (!doc.exists) return null;
+    return ChatConversation.fromDoc(doc);
+  }
+
+  Future<bool> canStartConversation({
+    required String currentUserId,
+    required String receiverId,
+  }) async {
+    final existing = await getConversation(
+      currentUserId: currentUserId,
+      receiverId: receiverId,
+    );
+    if (existing != null) return !existing.isBlockedFor(currentUserId);
+
+    final favoriteId = '${currentUserId}_$receiverId';
+    final favoriteDoc = await _firestore
+        .collection('favorites')
+        .doc(favoriteId)
+        .get();
+    return favoriteDoc.exists;
+  }
+
   Future<void> sendMessage({
     required String senderId,
     required String receiverId,
@@ -115,7 +165,24 @@ class ChatRepository {
     final now = FieldValue.serverTimestamp();
 
     await _firestore.runTransaction((transaction) async {
-      transaction.set(chatRef, {
+      final chatSnapshot = await transaction.get(chatRef);
+      if (chatSnapshot.exists) {
+        final conversation = ChatConversation.fromDoc(chatSnapshot);
+        if (conversation.blockedBy.isNotEmpty) {
+          throw StateError('Conversa bloqueada.');
+        }
+      } else {
+        final favoriteDoc = await transaction.get(
+          _firestore.collection('favorites').doc('${senderId}_$receiverId'),
+        );
+        if (!favoriteDoc.exists) {
+          throw StateError(
+            'Adicione o jogador aos observados antes de enviar mensagem.',
+          );
+        }
+      }
+
+      final chatData = <String, dynamic>{
         'id': chatId,
         'participantIds': participantIds,
         'participantNames': {
@@ -127,7 +194,12 @@ class ChatRepository {
         'lastMessage': trimmedText,
         'lastSenderId': senderId,
         'updatedAt': now,
-      }, SetOptions(merge: true));
+      };
+      if (!chatSnapshot.exists ||
+          !(chatSnapshot.data()?.containsKey('blockedBy') ?? false)) {
+        chatData['blockedBy'] = const <String>[];
+      }
+      transaction.set(chatRef, chatData, SetOptions(merge: true));
 
       transaction.set(messageRef, {
         'id': messageRef.id,
@@ -137,6 +209,28 @@ class ChatRepository {
         'sentAt': now,
       });
     });
+  }
+
+  Future<void> blockConversation({
+    required String currentUserId,
+    required String receiverId,
+  }) async {
+    final chatId = conversationId(currentUserId, receiverId);
+    await _firestore.collection('chats').doc(chatId).set({
+      'blockedBy': FieldValue.arrayUnion([currentUserId]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> unblockConversation({
+    required String currentUserId,
+    required String receiverId,
+  }) async {
+    final chatId = conversationId(currentUserId, receiverId);
+    await _firestore.collection('chats').doc(chatId).set({
+      'blockedBy': FieldValue.arrayRemove([currentUserId]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   Stream<List<ChatConversation>> watchConversations(String userId) {

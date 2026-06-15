@@ -117,6 +117,19 @@ class PlayerRepository {
     });
   }
 
+  Future<void> deleteVideo({
+    required String playerId,
+    required String videoId,
+  }) async {
+    final videoRef = _firestore.collection('videos').doc(videoId);
+    final video = await videoRef.get();
+    if (!video.exists) return;
+    if (video.data()?['playerId'] != playerId) {
+      throw StateError('Este video nao pertence ao jogador informado.');
+    }
+    await videoRef.delete();
+  }
+
   Stream<List<PlayerReview>> watchReviews(String playerId) {
     return _firestore
         .collection('reviews')

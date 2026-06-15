@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../models/app_user.dart';
 import '../../models/player.dart';
+import '../../models/player_video.dart';
+import '../../repositories/favorites_repository.dart';
 import '../../repositories/player_repository.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
@@ -123,38 +126,7 @@ class PerfilJogadorScreen extends StatelessWidget {
             children: [
               _Header(player: player),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed:
-                          currentUser == null || currentUser.uid == player.userId
-                          ? null
-                          : () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ChatScreen(
-                                  receiverId: player.userId,
-                                  receiverName: player.nome,
-                                ),
-                              ),
-                            ),
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text('Chat interno'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  IconButton.filledTonal(
-                    tooltip: 'WhatsApp',
-                    onPressed: player.telefone.isEmpty
-                        ? null
-                        : () => launchUrl(
-                            Uri.parse('https://wa.me/${player.telefone}'),
-                          ),
-                    icon: const Icon(Icons.phone),
-                  ),
-                ],
-              ),
+              _ContactActions(currentUser: currentUser, player: player),
               const SectionTitle('Informacoes basicas'),
               _InfoGrid(player: player),
               const SectionTitle('Estatisticas'),
@@ -166,7 +138,11 @@ class PerfilJogadorScreen extends StatelessWidget {
                     : player.biografia,
                 style: const TextStyle(color: AppColors.muted, height: 1.4),
               ),
-              _VideosSection(playerId: player.id, repository: repository),
+              _VideosSection(
+                playerId: player.id,
+                repository: repository,
+                canDelete: isOwner,
+              ),
               _ReviewsSection(player: player, repository: repository),
             ],
           ),
@@ -186,20 +162,30 @@ class _Header extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primaryDark, AppColors.primary],
+        ),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.2),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 44,
-            backgroundColor: AppColors.primaryLight,
+            backgroundColor: Colors.white.withValues(alpha: 0.16),
             backgroundImage: player.fotoUrl.isEmpty
                 ? null
                 : NetworkImage(player.fotoUrl),
             child: player.fotoUrl.isEmpty
-                ? const Icon(Icons.person, size: 42, color: AppColors.primary)
+                ? const Icon(Icons.person, size: 42, color: Colors.white)
                 : null,
           ),
           const SizedBox(width: 16),
@@ -212,14 +198,14 @@ class _Header extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
-                    color: AppColors.text,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   '${player.posicaoPrincipal} - ${player.idade} anos',
                   style: const TextStyle(
-                    color: AppColors.primary,
+                    color: Colors.white70,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -230,7 +216,10 @@ class _Header extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       '${player.mediaAvaliacoes.toStringAsFixed(1)} (${player.totalAvaliacoes})',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
@@ -239,6 +228,87 @@ class _Header extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ContactActions extends StatelessWidget {
+  const _ContactActions({required this.currentUser, required this.player});
+
+  final User? currentUser;
+  final Player player;
+
+  @override
+  Widget build(BuildContext context) {
+    final isOwner = currentUser?.uid == player.userId;
+    final favoritesRepository = FavoritesRepository();
+    final currentUserId = currentUser?.uid;
+
+    return FutureBuilder(
+      future: AuthService().getCurrentAppUser(),
+      builder: (context, userSnapshot) {
+        final appUser = userSnapshot.data;
+        final isScout = appUser?.tipoUsuario == UserType.clubeTreinadorOlheiro;
+
+        return Row(
+          children: [
+            Expanded(
+              child: currentUserId == null || isOwner || !isScout
+                  ? ElevatedButton.icon(
+                      onPressed: null,
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      label: const Text('Chat interno'),
+                    )
+                  : StreamBuilder<bool>(
+                      stream: favoritesRepository.watchIsFavorite(
+                        clubId: currentUserId,
+                        playerId: player.id,
+                      ),
+                      builder: (context, favoriteSnapshot) {
+                        final isFavorite = favoriteSnapshot.data ?? false;
+                        if (!isFavorite) {
+                          return OutlinedButton.icon(
+                            onPressed: () => favoritesRepository.toggleFavorite(
+                              clubId: currentUserId,
+                              playerId: player.id,
+                              isFavorite: false,
+                            ),
+                            icon: const Icon(Icons.favorite_border),
+                            label: const Text('Observar para chat'),
+                          );
+                        }
+
+                        return ElevatedButton.icon(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                receiverId: player.userId,
+                                receiverName: player.nome.isEmpty
+                                    ? 'Jogador'
+                                    : player.nome,
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.chat_bubble_outline),
+                          label: const Text('Chat interno'),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(width: 10),
+            IconButton.filledTonal(
+              tooltip: 'WhatsApp',
+              onPressed: player.telefone.isEmpty
+                  ? null
+                  : () => launchUrl(
+                      Uri.parse('https://wa.me/${player.telefone}'),
+                    ),
+              icon: const Icon(Icons.phone),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -266,11 +336,7 @@ class _InfoGrid extends StatelessWidget {
           width: (MediaQuery.of(context).size.width - 42) / 2,
           child: Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.border),
-            ),
+            decoration: AppDecorations.card(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -309,11 +375,7 @@ class _StatsGrid extends StatelessWidget {
           child: Container(
             margin: const EdgeInsets.only(right: 6),
             padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.border),
-            ),
+            decoration: AppDecorations.card(),
             child: Column(
               children: [
                 Text(
@@ -334,10 +396,15 @@ class _StatsGrid extends StatelessWidget {
 }
 
 class _VideosSection extends StatelessWidget {
-  const _VideosSection({required this.playerId, required this.repository});
+  const _VideosSection({
+    required this.playerId,
+    required this.repository,
+    required this.canDelete,
+  });
 
   final String playerId;
   final PlayerRepository repository;
+  final bool canDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -361,27 +428,66 @@ class _VideosSection extends StatelessWidget {
                 separatorBuilder: (_, _) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
                   final video = videos[index];
-                  return InkWell(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            VideoPlayerScreen(videoUrl: video.videoUrl),
-                      ),
-                    ),
-                    child: Container(
-                      width: 220,
-                      decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.play_circle,
-                          color: Colors.white,
-                          size: 48,
+                  return SizedBox(
+                    width: 220,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    VideoPlayerScreen(videoUrl: video.videoUrl),
+                              ),
+                            ),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black87,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.play_circle,
+                                  color: Colors.white,
+                                  size: 48,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        if (canDelete)
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: IconButton.filled(
+                              tooltip: 'Remover video',
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.black.withValues(
+                                  alpha: 0.72,
+                                ),
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () => _confirmDelete(context, video),
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                          ),
+                        Positioned(
+                          left: 10,
+                          right: canDelete ? 54 : 10,
+                          bottom: 10,
+                          child: Text(
+                            video.titulo,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -391,6 +497,45 @@ class _VideosSection extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, PlayerVideo video) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Remover video?'),
+          content: const Text(
+            'O video deixara de aparecer no seu perfil. O arquivo no Cloudinary pode ser apagado depois pela Biblioteca de Midia.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Remover'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await repository.deleteVideo(playerId: playerId, videoId: video.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Video removido do perfil.')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nao foi possivel remover o video: $error')),
+      );
+    }
   }
 }
 
@@ -427,11 +572,7 @@ class _ReviewsSectionState extends State<_ReviewsSection> {
           Container(
             padding: const EdgeInsets.all(14),
             margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.border),
-            ),
+            decoration: AppDecorations.card(),
             child: Column(
               children: [
                 Row(

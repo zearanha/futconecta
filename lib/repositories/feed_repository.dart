@@ -45,9 +45,11 @@ class FeedRepository {
     required AppUser author,
     required FeedPostType type,
     required String content,
+    String imageUrl = '',
   }) async {
     final text = content.trim();
-    if (text.isEmpty) return;
+    final image = imageUrl.trim();
+    if (text.isEmpty && image.isEmpty) return;
 
     final doc = _firestore.collection('feedPosts').doc();
     await doc.set({
@@ -59,6 +61,7 @@ class FeedRepository {
       'authorState': author.estado,
       'type': type.value,
       'content': text,
+      'imageUrl': image,
       'likeCount': 0,
       'commentCount': 0,
       'createdAt': FieldValue.serverTimestamp(),

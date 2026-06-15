@@ -26,6 +26,14 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O FutConecta precisa acessar sua galeria para selecionar fotos e videos do perfil.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>O FutConecta pode salvar midias relacionadas ao seu perfil quando necessario.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>O FutConecta pode usar a camera para fotos e videos do perfil quando voce escolher essa opcao.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>O FutConecta pode usar o microfone ao gravar videos do perfil quando voce escolher essa opcao.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

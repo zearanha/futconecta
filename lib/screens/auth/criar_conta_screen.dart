@@ -88,15 +88,15 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Cadastro')),
+      appBar: AppBar(title: const Text('Criar conta')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
               children: [
-                const _SignupHeader(),
+                _SignupHeader(type: _tipoSelecionado),
                 const SizedBox(height: 18),
                 _AccountTypeSelector(
                   selected: _tipoSelecionado,
@@ -106,24 +106,45 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
                 ),
                 const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.border),
-                  ),
+                  padding: const EdgeInsets.all(18),
+                  decoration: AppDecorations.card(),
                   child: Form(
                     key: _formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Dados da conta',
-                          style: TextStyle(
-                            color: AppColors.text,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: _tipoSelecionado == UserType.jogador
+                                    ? AppColors.primaryLight
+                                    : AppColors.scoutLight,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                _tipoSelecionado == UserType.jogador
+                                    ? Icons.sports_soccer
+                                    : Icons.manage_search,
+                                color: _tipoSelecionado == UserType.jogador
+                                    ? AppColors.primary
+                                    : AppColors.scout,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text(
+                                'Dados da conta',
+                                style: TextStyle(
+                                  color: AppColors.text,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -276,50 +297,126 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
 }
 
 class _SignupHeader extends StatelessWidget {
-  const _SignupHeader();
+  const _SignupHeader({required this.type});
+
+  final UserType type;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPlayer = type == UserType.jogador;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: AppDecorations.heroGradient,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.22),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Icon(
+                  isPlayer ? Icons.sports_soccer : Icons.manage_search,
+                  color: Colors.white,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'FutConecta',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 25,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      isPlayer
+                          ? 'Seu perfil para ser encontrado.'
+                          : 'Sua central para descobrir talentos.',
+                      maxLines: 2,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _HeroBadge(
+                icon: Icons.verified_outlined,
+                text: isPlayer ? 'Perfil esportivo' : 'Busca avancada',
+              ),
+              _HeroBadge(
+                icon: Icons.chat_bubble_outline,
+                text: isPlayer ? 'Receba contatos' : 'Converse com atletas',
+              ),
+              _HeroBadge(
+                icon: Icons.trending_up,
+                text: isPlayer ? 'Ranking e feed' : 'Pipeline de observacao',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroBadge extends StatelessWidget {
+  const _HeroBadge({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.sports_soccer,
+          Icon(icon, color: Colors.white, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: const TextStyle(
               color: Colors.white,
-              size: 30,
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Entre para o FutConecta',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Crie seu acesso e conecte talentos, clubes e oportunidades.',
-                  style: TextStyle(color: Colors.white70),
-                ),
-              ],
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -390,21 +487,38 @@ class _AccountTypeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final activeColor = title == 'Jogador'
+        ? AppColors.primary
+        : AppColors.scout;
+    final activeLight = title == 'Jogador'
+        ? AppColors.primaryLight
+        : AppColors.scoutLight;
+
     return Material(
-      color: selected ? AppColors.primaryLight : AppColors.surface,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Container(
           constraints: const BoxConstraints(minHeight: 118),
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
+            color: selected ? activeLight : AppColors.surface,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
-              width: selected ? 1.4 : 1,
+              color: selected ? activeColor : AppColors.border,
+              width: selected ? 1.5 : 1,
             ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: activeColor.withValues(alpha: 0.12),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,13 +527,10 @@ class _AccountTypeCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: selected ? AppColors.primary : AppColors.background,
+                  color: selected ? activeColor : AppColors.surfaceSoft,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  icon,
-                  color: selected ? Colors.white : AppColors.primary,
-                ),
+                child: Icon(icon, color: selected ? Colors.white : activeColor),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -439,9 +550,9 @@ class _AccountTypeCard extends StatelessWidget {
                           ),
                         ),
                         if (selected)
-                          const Icon(
+                          Icon(
                             Icons.check_circle,
-                            color: AppColors.primary,
+                            color: activeColor,
                             size: 20,
                           ),
                       ],
@@ -473,18 +584,19 @@ class _NextStepNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPlayer = type == UserType.jogador;
+    final color = isPlayer ? AppColors.primary : AppColors.scout;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
       child: Row(
         children: [
           Icon(
             isPlayer ? Icons.edit_note : Icons.dashboard_customize_outlined,
-            color: AppColors.primary,
+            color: color,
           ),
           const SizedBox(width: 10),
           Expanded(

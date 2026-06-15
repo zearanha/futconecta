@@ -6,6 +6,7 @@ import '../../repositories/favorites_repository.dart';
 import '../../repositories/player_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/player_card.dart';
+import '../chat/chat_screen.dart';
 import '../perfil/perfil_jogador_screen.dart';
 
 class BuscaJogadoresScreen extends StatefulWidget {
@@ -137,6 +138,13 @@ class _BuscaJogadoresScreenState extends State<BuscaJogadoresScreen> {
                         return PlayerCard(
                           player: player,
                           isFavorite: isFavorite,
+                          onMessage: currentUserId == null
+                              ? null
+                              : () => _openChatOrExplain(
+                                  context: context,
+                                  player: player,
+                                  isFavorite: isFavorite,
+                                ),
                           onFavorite: currentUserId == null
                               ? null
                               : () => _favoritesRepository.toggleFavorite(
@@ -160,6 +168,33 @@ class _BuscaJogadoresScreenState extends State<BuscaJogadoresScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  void _openChatOrExplain({
+    required BuildContext context,
+    required Player player,
+    required bool isFavorite,
+  }) {
+    if (!isFavorite) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Adicione o jogador aos observados antes de conversar.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          receiverId: player.userId,
+          receiverName: player.nome.isEmpty ? 'Jogador' : player.nome,
+        ),
       ),
     );
   }
@@ -200,21 +235,33 @@ class _SearchPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
+      decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Critérios de prospecção',
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.scoutLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.manage_search, color: AppColors.scout),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Critérios de prospecção',
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           const Text(

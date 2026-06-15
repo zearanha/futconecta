@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/player.dart';
 import '../../repositories/player_repository.dart';
 import '../../services/storage_service.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/section_title.dart';
 
@@ -43,9 +44,11 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   String? _posicaoSecundaria;
   String? _peDominante;
   String _fotoUrl = '';
-  File? _foto;
+  XFile? _foto;
+  Uint8List? _fotoPreviewBytes;
   bool _loaded = false;
   bool _saving = false;
+  bool _uploadingVideo = false;
 
   static const _posicoes = [
     'Goleiro',
@@ -101,9 +104,25 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   }
 
   Future<void> _pickPhoto() async {
-    final image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null && mounted) {
-      setState(() => _foto = File(image.path));
+    try {
+      final image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1200,
+      );
+      if (image == null) {
+        _showMessage('Nenhuma imagem selecionada.');
+        return;
+      }
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _foto = image;
+        _fotoPreviewBytes = bytes;
+      });
+      _showMessage('Foto selecionada. Toque em Salvar perfil para enviar.');
+    } catch (error) {
+      _showMessage('Nao foi possivel selecionar a foto: $error');
     }
   }
 
@@ -113,18 +132,29 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
       _showMessage('Faca login para enviar videos.');
       return;
     }
+    if (_uploadingVideo) return;
 
-    final video = await _picker.pickVideo(source: ImageSource.gallery);
-    if (video == null) return;
+    try {
+      setState(() => _uploadingVideo = true);
+      final video = await _picker.pickVideo(source: ImageSource.gallery);
+      if (video == null) {
+        _showMessage('Nenhum video selecionado.');
+        return;
+      }
 
-    final url = await _storage.uploadPlayerVideo(playerId, File(video.path));
-    await _repository.addVideo(
-      playerId: playerId,
-      videoUrl: url,
-      titulo: 'Video de desempenho',
-    );
+      final url = await _storage.uploadPlayerVideo(playerId, video);
+      await _repository.addVideo(
+        playerId: playerId,
+        videoUrl: url,
+        titulo: 'Video de desempenho',
+      );
 
-    _showMessage('Video enviado com sucesso.');
+      _showMessage('Video enviado com sucesso.');
+    } catch (error) {
+      _showMessage('Nao foi possivel enviar o video: $error');
+    } finally {
+      if (mounted) setState(() => _uploadingVideo = false);
+    }
   }
 
   Future<void> _save() async {
@@ -171,7 +201,11 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
       );
 
       await _repository.savePlayer(player);
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      _showMessage('Perfil salvo com sucesso.');
+      Navigator.pop(context);
+    } catch (error) {
+      _showMessage('Nao foi possivel salvar o perfil: $error');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -224,18 +258,11 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               Center(
-                child: InkWell(
-                  onTap: _pickPhoto,
-                  child: CircleAvatar(
-                    radius: 54,
-                    backgroundImage: _foto != null
-                        ? FileImage(_foto!)
-                        : (_fotoUrl.isEmpty ? null : NetworkImage(_fotoUrl))
-                              as ImageProvider?,
-                    child: _foto == null && _fotoUrl.isEmpty
-                        ? const Icon(Icons.add_a_photo, size: 34)
-                        : null,
-                  ),
+                child: _ProfilePhotoPicker(
+                  photoUrl: _fotoUrl,
+                  previewBytes: _fotoPreviewBytes,
+                  saving: _saving,
+                  onTap: _saving ? null : _pickPhoto,
                 ),
               ),
               const SectionTitle('Informacoes basicas'),
@@ -345,9 +372,19 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
-                onPressed: _pickVideo,
-                icon: const Icon(Icons.video_library_outlined),
-                label: const Text('Adicionar video de desempenho'),
+                onPressed: _uploadingVideo ? null : _pickVideo,
+                icon: _uploadingVideo
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.video_library_outlined),
+                label: Text(
+                  _uploadingVideo
+                      ? 'Enviando video...'
+                      : 'Adicionar video de desempenho',
+                ),
               ),
               const SizedBox(height: 10),
               ElevatedButton(
@@ -383,6 +420,93 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
           .map((item) => DropdownMenuItem(value: item, child: Text(item)))
           .toList(),
       onChanged: onChanged,
+    );
+  }
+}
+
+class _ProfilePhotoPicker extends StatelessWidget {
+  const _ProfilePhotoPicker({
+    required this.photoUrl,
+    required this.previewBytes,
+    required this.saving,
+    required this.onTap,
+  });
+
+  final String photoUrl;
+  final Uint8List? previewBytes;
+  final bool saving;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ImageProvider? image = previewBytes != null
+        ? MemoryImage(previewBytes!)
+        : (photoUrl.isEmpty ? null : NetworkImage(photoUrl));
+
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 58,
+                  backgroundColor: AppColors.primaryLight,
+                  backgroundImage: image,
+                  child: image == null
+                      ? const Icon(
+                          Icons.person,
+                          size: 46,
+                          color: AppColors.primary,
+                        )
+                      : null,
+                ),
+                if (saving)
+                  Container(
+                    width: 116,
+                    height: 116,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.32),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    ),
+                  ),
+                Positioned(
+                  right: 2,
+                  bottom: 6,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                    ),
+                    child: const Icon(
+                      Icons.photo_camera_outlined,
+                      color: Colors.white,
+                      size: 19,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: onTap,
+          icon: const Icon(Icons.image_outlined, size: 18),
+          label: const Text('Alterar foto'),
+        ),
+      ],
     );
   }
 }

@@ -5,6 +5,7 @@ import '../../repositories/favorites_repository.dart';
 import '../../repositories/player_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/player_card.dart';
+import '../chat/chat_screen.dart';
 import '../perfil/perfil_jogador_screen.dart';
 
 class FavoritosScreen extends StatefulWidget {
@@ -88,6 +89,17 @@ class _FavoritosScreenState extends State<FavoritosScreen> {
                         child: PlayerCard(
                           player: player,
                           isFavorite: true,
+                          onMessage: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                receiverId: player.userId,
+                                receiverName: player.nome.isEmpty
+                                    ? 'Jogador'
+                                    : player.nome,
+                              ),
+                            ),
+                          ),
                           onFavorite: () => favoritesRepository.toggleFavorite(
                             clubId: userId,
                             playerId: player.id,

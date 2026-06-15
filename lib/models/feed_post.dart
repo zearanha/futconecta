@@ -49,6 +49,7 @@ class FeedPost {
     required this.authorState,
     required this.type,
     required this.content,
+    required this.imageUrl,
     required this.likeCount,
     required this.commentCount,
     required this.createdAt,
@@ -62,6 +63,7 @@ class FeedPost {
   final String authorState;
   final FeedPostType type;
   final String content;
+  final String imageUrl;
   final int likeCount;
   final int commentCount;
   final DateTime? createdAt;
@@ -77,6 +79,7 @@ class FeedPost {
       authorState: data['authorState'] ?? '',
       type: FeedPostTypeX.fromValue(data['type']),
       content: data['content'] ?? '',
+      imageUrl: data['imageUrl'] ?? '',
       likeCount: _toInt(data['likeCount']),
       commentCount: _toInt(data['commentCount']),
       createdAt: _toDate(data['createdAt']),

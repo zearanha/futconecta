@@ -84,6 +84,7 @@ class _ConversationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mine = conversation.lastSenderId == currentUserId;
+    final blocked = conversation.blockedBy.isNotEmpty;
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(8),
@@ -118,15 +119,22 @@ class _ConversationTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${mine ? 'Voce: ' : ''}${conversation.lastMessage}',
+                      blocked
+                          ? 'Conversa bloqueada'
+                          : '${mine ? 'Voce: ' : ''}${conversation.lastMessage}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.muted),
+                      style: TextStyle(
+                        color: blocked ? Colors.redAccent : AppColors.muted,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AppColors.muted),
+              Icon(
+                blocked ? Icons.block : Icons.chevron_right,
+                color: blocked ? Colors.redAccent : AppColors.muted,
+              ),
             ],
           ),
         ),

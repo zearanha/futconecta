@@ -4,6 +4,7 @@ import '../../models/app_user.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../feed/chat_lista_screen.dart';
+import '../feed/feed_olheiro_screen.dart';
 import '../feed/feed_screen.dart';
 import '../favoritos/favoritos_screen.dart';
 import '../perfil/perfil_jogador_screen.dart';
@@ -45,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final isScout = user.tipoUsuario == UserType.clubeTreinadorOlheiro;
         final telas = isScout
             ? const [
-                FeedScreen(),
+                FeedOlheiroScreen(),
                 RankingScreen(),
                 FavoritosScreen(),
                 ChatListaScreen(),
@@ -58,68 +59,275 @@ class _HomeScreenState extends State<HomeScreen> {
                 ChatListaScreen(),
                 SettingsScreen(),
               ];
-        final destinations = isScout
+        final items = isScout
             ? const [
-                NavigationDestination(
-                  icon: Icon(Icons.dynamic_feed_outlined),
-                  label: 'Feed',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.leaderboard_outlined),
+                _BottomNavItem(icon: Icons.home_rounded, label: 'Inicio'),
+                _BottomNavItem(
+                  icon: Icons.leaderboard_outlined,
+                  selectedIcon: Icons.leaderboard_rounded,
                   label: 'Ranking',
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.bookmark_border),
+                _BottomNavItem(
+                  icon: Icons.favorite_border_rounded,
+                  selectedIcon: Icons.favorite_rounded,
                   label: 'Observados',
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.chat_bubble_outline),
+                _BottomNavItem(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  selectedIcon: Icons.chat_bubble_rounded,
                   label: 'Chat',
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  label: 'Config',
+                _BottomNavItem(
+                  icon: Icons.settings_outlined,
+                  selectedIcon: Icons.settings_rounded,
+                  label: 'Conta',
                 ),
               ]
             : const [
-                NavigationDestination(
-                  icon: Icon(Icons.dynamic_feed_outlined),
-                  label: 'Feed',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.person_outline),
+                _BottomNavItem(icon: Icons.home_rounded, label: 'Inicio'),
+                _BottomNavItem(
+                  icon: Icons.person_outline_rounded,
+                  selectedIcon: Icons.person_rounded,
                   label: 'Perfil',
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.leaderboard_outlined),
+                _BottomNavItem(
+                  icon: Icons.leaderboard_outlined,
+                  selectedIcon: Icons.leaderboard_rounded,
                   label: 'Ranking',
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.chat_bubble_outline),
+                _BottomNavItem(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  selectedIcon: Icons.chat_bubble_rounded,
                   label: 'Chat',
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  label: 'Config',
+                _BottomNavItem(
+                  icon: Icons.settings_outlined,
+                  selectedIcon: Icons.settings_rounded,
+                  label: 'Conta',
                 ),
               ];
 
         final selectedIndex = _indiceAtual.clamp(0, telas.length - 1);
         return Scaffold(
           body: IndexedStack(index: selectedIndex, children: telas),
-          bottomNavigationBar: NavigationBar(
+          bottomNavigationBar: _FutConectaBottomNav(
             selectedIndex: selectedIndex,
-            backgroundColor: AppColors.surface,
-            indicatorColor: AppColors.primaryLight,
-            onDestinationSelected: (index) => setState(() {
+            items: items,
+            onSelected: (index) => setState(() {
               _indiceAtual = index;
             }),
-            destinations: destinations,
           ),
         );
       },
     );
   }
+}
+
+class _FutConectaBottomNav extends StatelessWidget {
+  const _FutConectaBottomNav({
+    required this.selectedIndex,
+    required this.items,
+    required this.onSelected,
+  });
+
+  final int selectedIndex;
+  final List<_BottomNavItem> items;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14, 0, 14, 10 + bottomPadding),
+      child: SizedBox(
+        height: 76,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final itemWidth = width / items.length;
+            final selectedCenter = itemWidth * (selectedIndex + 0.5);
+
+            return Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.bottomCenter,
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: CustomPaint(
+                    painter: _NotchedNavBarPainter(
+                      selectedCenter: selectedCenter,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).scaffoldBackgroundColor,
+                    ),
+                    child: SizedBox(
+                      height: 58,
+                      child: Row(
+                        children: [
+                          for (var index = 0; index < items.length; index++)
+                            Expanded(
+                              child: _BottomNavButton(
+                                item: items[index],
+                                selected: selectedIndex == index,
+                                onTap: () => onSelected(index),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  left: selectedCenter - 31,
+                  bottom: 26,
+                  child: _SelectedNavButton(
+                    item: items[selectedIndex],
+                    onTap: () => onSelected(selectedIndex),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _NotchedNavBarPainter extends CustomPainter {
+  const _NotchedNavBarPainter({
+    required this.selectedCenter,
+    required this.backgroundColor,
+  });
+
+  final double selectedCenter;
+  final Color backgroundColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.18)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+    final shadowRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(2, 4, size.width - 4, size.height - 4),
+      const Radius.circular(9),
+    );
+    canvas.drawRRect(shadowRect, shadowPaint);
+
+    final barPaint = Paint()..color = const Color(0xFF050706);
+    final barRect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(9),
+    );
+    canvas.drawRRect(barRect, barPaint);
+
+    final cutoutPaint = Paint()
+      ..color = backgroundColor
+      ..blendMode = BlendMode.srcOver;
+    canvas.drawCircle(Offset(selectedCenter, 0), 34, cutoutPaint);
+
+    final repairPaint = Paint()..color = const Color(0xFF050706);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 20, size.width, size.height - 20),
+        const Radius.circular(9),
+      ),
+      repairPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _NotchedNavBarPainter oldDelegate) {
+    return oldDelegate.selectedCenter != selectedCenter ||
+        oldDelegate.backgroundColor != backgroundColor;
+  }
+}
+
+class _BottomNavButton extends StatelessWidget {
+  const _BottomNavButton({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _BottomNavItem item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: item.label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            height: 58,
+            child: Center(
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: selected ? 0 : 1,
+                child: Icon(item.icon, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectedNavButton extends StatelessWidget {
+  const _SelectedNavButton({required this.item, required this.onTap});
+
+  final _BottomNavItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: item.label,
+      child: Container(
+        width: 62,
+        height: 62,
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          shape: BoxShape.circle,
+        ),
+        padding: const EdgeInsets.all(7),
+        child: Material(
+          color: const Color(0xFF050706),
+          shape: const CircleBorder(),
+          elevation: 8,
+          shadowColor: Colors.black.withValues(alpha: 0.24),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: Icon(item.selectedIcon, color: AppColors.accent, size: 25),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomNavItem {
+  const _BottomNavItem({
+    required this.icon,
+    required this.label,
+    IconData? selectedIcon,
+  }) : selectedIcon = selectedIcon ?? icon;
+
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
 }
 
 class _HomeLoadError extends StatelessWidget {

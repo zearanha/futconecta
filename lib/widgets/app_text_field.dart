@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class AppTextField extends StatelessWidget {
   const AppTextField({
     super.key,
@@ -41,7 +43,9 @@ class AppTextField extends StatelessWidget {
       onFieldSubmitted: onFieldSubmitted,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: icon == null ? null : Icon(icon),
+        prefixIcon: icon == null
+            ? null
+            : Icon(icon, color: AppColors.primary, size: 21),
         suffixIcon: suffixIcon,
       ),
     );
