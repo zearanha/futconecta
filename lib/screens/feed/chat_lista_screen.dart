@@ -85,6 +85,9 @@ class _ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final mine = conversation.lastSenderId == currentUserId;
     final blocked = conversation.blockedBy.isNotEmpty;
+    final unreadCount = conversation.unreadCountFor(currentUserId);
+    final hasUnread = unreadCount > 0;
+    final typing = conversation.isTyping(conversation.otherUserId(currentUserId));
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(8),
@@ -112,31 +115,84 @@ class _ConversationTile extends StatelessWidget {
                       otherName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.text,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: hasUnread
+                            ? FontWeight.w900
+                            : FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      blocked
-                          ? 'Conversa bloqueada'
-                          : '${mine ? 'Voce: ' : ''}${conversation.lastMessage}',
+                      _subtitle(
+                        blocked: blocked,
+                        typing: typing,
+                        mine: mine,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: blocked ? Colors.redAccent : AppColors.muted,
+                        color: blocked
+                            ? Colors.redAccent
+                            : typing
+                            ? AppColors.accent
+                            : AppColors.muted,
+                        fontWeight: hasUnread
+                            ? FontWeight.w900
+                            : FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
+              if (hasUnread) ...[
+                const SizedBox(width: 10),
+                _UnreadBadge(count: unreadCount),
+              ],
+              const SizedBox(width: 6),
               Icon(
                 blocked ? Icons.block : Icons.chevron_right,
                 color: blocked ? Colors.redAccent : AppColors.muted,
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  String _subtitle({
+    required bool blocked,
+    required bool typing,
+    required bool mine,
+  }) {
+    if (blocked) return 'Conversa bloqueada';
+    if (typing) return '$otherName esta digitando...';
+    return '${mine ? 'Voce: ' : ''}${conversation.lastMessage}';
+  }
+}
+
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );

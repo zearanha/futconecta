@@ -81,8 +81,11 @@ class FeedRepository {
       final post = await transaction.get(postRef);
       if (!post.exists) return;
 
+      final like = await transaction.get(likeRef);
       final currentCount = (post.data()?['likeCount'] as num?)?.toInt() ?? 0;
+
       if (isLiked) {
+        if (!like.exists) return;
         transaction.delete(likeRef);
         transaction.update(postRef, {
           'likeCount': currentCount > 0 ? currentCount - 1 : 0,
@@ -91,6 +94,7 @@ class FeedRepository {
         return;
       }
 
+      if (like.exists) return;
       transaction.set(likeRef, {
         'userId': userId,
         'createdAt': FieldValue.serverTimestamp(),
@@ -113,23 +117,20 @@ class FeedRepository {
     final postRef = _firestore.collection('feedPosts').doc(postId);
     final commentRef = postRef.collection('comments').doc();
 
-    await _firestore.runTransaction((transaction) async {
-      final post = await transaction.get(postRef);
-      if (!post.exists) return;
-
-      final currentCount = (post.data()?['commentCount'] as num?)?.toInt() ?? 0;
-      transaction.set(commentRef, {
+    final batch = _firestore.batch()
+      ..set(commentRef, {
         'id': commentRef.id,
         'authorId': author.id,
         'authorName': author.nome,
         'authorType': author.tipoUsuario.value,
         'text': trimmedText,
         'createdAt': FieldValue.serverTimestamp(),
-      });
-      transaction.update(postRef, {
-        'commentCount': currentCount + 1,
+      })
+      ..update(postRef, {
+        'commentCount': FieldValue.increment(1),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-    });
+
+    await batch.commit();
   }
 }

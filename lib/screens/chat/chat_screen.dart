@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -28,6 +30,9 @@ class _ChatScreenState extends State<ChatScreen> {
       .getCurrentAppUser();
   bool _sending = false;
   bool _searching = false;
+  bool _markingAsRead = false;
+  bool _typingActive = false;
+  Timer? _typingResetTimer;
 
   Future<void> _send(AppUser? appUser) async {
     final text = _controller.text.trim();
@@ -38,6 +43,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.clear();
 
     try {
+      await _setTyping(currentUserId: user.uid, isTyping: false);
       await _repository.sendMessage(
         senderId: user.uid,
         receiverId: widget.receiverId,
@@ -84,6 +90,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (_typingActive && userId != null) {
+      _repository.setTyping(
+        currentUserId: userId,
+        receiverId: widget.receiverId,
+        isTyping: false,
+      );
+    }
+    _typingResetTimer?.cancel();
     _controller.dispose();
     _searchController.dispose();
     super.dispose();
@@ -106,11 +121,18 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           builder: (context, conversationSnapshot) {
             final conversation = conversationSnapshot.data;
+            if ((conversation?.unreadCountFor(user.uid) ?? 0) > 0) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _markConversationAsRead(user.uid);
+              });
+            }
             final blockedByMe = conversation?.blockedByUser(user.uid) ?? false;
             final blockedByOther =
                 conversation != null &&
                 conversation.blockedBy.isNotEmpty &&
                 !blockedByMe;
+            final receiverTyping =
+                conversation?.isTyping(widget.receiverId) ?? false;
 
             return FutureBuilder<bool>(
               future: _repository.canStartConversation(
@@ -194,6 +216,8 @@ class _ChatScreenState extends State<ChatScreen> {
                             blockedByOther: blockedByOther,
                           ),
                         ),
+                      if (receiverTyping)
+                        _TypingIndicator(name: widget.receiverName),
                       Expanded(
                         child: StreamBuilder<List<ChatMessage>>(
                           stream: _repository.watchMessages(
@@ -265,6 +289,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                   minLines: 1,
                                   maxLines: 4,
                                   textInputAction: TextInputAction.send,
+                                  onChanged: (_) => _handleTypingChanged(
+                                    currentUserId: user.uid,
+                                    canSend: canSend,
+                                    hasConversation: conversation != null,
+                                  ),
                                   onSubmitted: (_) {
                                     if (canSend) _send(userSnapshot.data);
                                   },
@@ -322,6 +351,56 @@ class _ChatScreenState extends State<ChatScreen> {
       return 'Para iniciar conversa, adicione o jogador aos observados.';
     }
     return 'Envio indisponivel no momento.';
+  }
+
+  Future<void> _markConversationAsRead(String currentUserId) async {
+    if (_markingAsRead || !mounted) return;
+
+    _markingAsRead = true;
+    try {
+      await _repository.markConversationAsRead(
+        currentUserId: currentUserId,
+        receiverId: widget.receiverId,
+      );
+    } finally {
+      _markingAsRead = false;
+    }
+  }
+
+  void _handleTypingChanged({
+    required String currentUserId,
+    required bool canSend,
+    required bool hasConversation,
+  }) {
+    final isTyping =
+        canSend && hasConversation && _controller.text.trim().isNotEmpty;
+    _typingResetTimer?.cancel();
+
+    if (isTyping) {
+      _typingResetTimer = Timer(const Duration(seconds: 3), () {
+        _setTyping(currentUserId: currentUserId, isTyping: false);
+      });
+    }
+
+    _setTyping(currentUserId: currentUserId, isTyping: isTyping);
+  }
+
+  Future<void> _setTyping({
+    required String currentUserId,
+    required bool isTyping,
+  }) async {
+    if (_typingActive == isTyping) return;
+
+    _typingActive = isTyping;
+    try {
+      await _repository.setTyping(
+        currentUserId: currentUserId,
+        receiverId: widget.receiverId,
+        isTyping: isTyping,
+      );
+    } catch (_) {
+      _typingActive = !isTyping;
+    }
   }
 }
 
@@ -428,6 +507,44 @@ class _ChatNotice extends StatelessWidget {
               style: const TextStyle(
                 color: AppColors.text,
                 fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TypingIndicator extends StatelessWidget {
+  const _TypingIndicator({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.more_horiz, color: AppColors.accent, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$name esta digitando...',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),

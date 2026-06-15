@@ -699,11 +699,7 @@ class _FeedPostCard extends StatelessWidget {
                       children: [
                         IconButton(
                           tooltip: liked ? 'Remover curtida' : 'Curtir',
-                          onPressed: () => repository.toggleLike(
-                            postId: post.id,
-                            userId: currentUserId,
-                            isLiked: liked,
-                          ),
+                          onPressed: () => _toggleLike(context, liked),
                           icon: Icon(
                             liked ? Icons.favorite : Icons.favorite_border,
                             color: liked
@@ -738,6 +734,21 @@ class _FeedPostCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _toggleLike(BuildContext context, bool liked) async {
+    try {
+      await repository.toggleLike(
+        postId: post.id,
+        userId: currentUserId,
+        isLiked: liked,
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nao foi possivel atualizar a curtida: $error')),
+      );
+    }
   }
 
   void _openComments(BuildContext context) {

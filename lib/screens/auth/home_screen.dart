@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/app_user.dart';
+import '../../repositories/chat_repository.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../feed/chat_lista_screen.dart';
@@ -19,6 +20,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _indiceAtual = 0;
+  int? _lastUnreadCount;
+  final _chatRepository = ChatRepository();
   late final Future<AppUser?> _userFuture = AuthService().getCurrentAppUser();
 
   @override
@@ -58,71 +61,125 @@ class _HomeScreenState extends State<HomeScreen> {
                 ChatListaScreen(),
                 SettingsScreen(),
               ];
-        final items = isScout
-            ? const [
-                _BottomNavItem(
-                  icon: Icons.dynamic_feed_outlined,
-                  selectedIcon: Icons.dynamic_feed_rounded,
-                  label: 'Feed',
-                ),
-                _BottomNavItem(
-                  icon: Icons.leaderboard_outlined,
-                  selectedIcon: Icons.leaderboard_rounded,
-                  label: 'Ranking',
-                ),
-                _BottomNavItem(
-                  icon: Icons.favorite_border_rounded,
-                  selectedIcon: Icons.favorite_rounded,
-                  label: 'Observados',
-                ),
-                _BottomNavItem(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  selectedIcon: Icons.chat_bubble_rounded,
-                  label: 'Chat',
-                ),
-                _BottomNavItem(
-                  icon: Icons.settings_outlined,
-                  selectedIcon: Icons.settings_rounded,
-                  label: 'Conta',
-                ),
-              ]
-            : const [
-                _BottomNavItem(icon: Icons.home_rounded, label: 'Inicio'),
-                _BottomNavItem(
-                  icon: Icons.person_outline_rounded,
-                  selectedIcon: Icons.person_rounded,
-                  label: 'Perfil',
-                ),
-                _BottomNavItem(
-                  icon: Icons.leaderboard_outlined,
-                  selectedIcon: Icons.leaderboard_rounded,
-                  label: 'Ranking',
-                ),
-                _BottomNavItem(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  selectedIcon: Icons.chat_bubble_rounded,
-                  label: 'Chat',
-                ),
-                _BottomNavItem(
-                  icon: Icons.settings_outlined,
-                  selectedIcon: Icons.settings_rounded,
-                  label: 'Conta',
-                ),
-              ];
-
         final selectedIndex = _indiceAtual.clamp(0, telas.length - 1);
-        return Scaffold(
-          body: IndexedStack(index: selectedIndex, children: telas),
-          bottomNavigationBar: _FutConectaBottomNav(
-            selectedIndex: selectedIndex,
-            items: items,
-            onSelected: (index) => setState(() {
-              _indiceAtual = index;
-            }),
-          ),
+        return StreamBuilder<int>(
+          stream: _chatRepository.watchUnreadCount(user.id),
+          builder: (context, unreadSnapshot) {
+            final chatUnreadCount = unreadSnapshot.data ?? 0;
+            final items = _navItems(
+              isScout: isScout,
+              chatUnreadCount: chatUnreadCount,
+            );
+            final chatIndex = items.indexWhere((item) => item.label == 'Chat');
+            _maybeNotifyUnread(context, chatUnreadCount, chatIndex);
+
+            return Scaffold(
+              body: IndexedStack(index: selectedIndex, children: telas),
+              bottomNavigationBar: _FutConectaBottomNav(
+                selectedIndex: selectedIndex,
+                items: items,
+                onSelected: (index) => setState(() {
+                  _indiceAtual = index;
+                }),
+              ),
+            );
+          },
         );
       },
     );
+  }
+
+  List<_BottomNavItem> _navItems({
+    required bool isScout,
+    required int chatUnreadCount,
+  }) {
+    if (isScout) {
+      return [
+        const _BottomNavItem(
+          icon: Icons.dynamic_feed_outlined,
+          selectedIcon: Icons.dynamic_feed_rounded,
+          label: 'Feed',
+        ),
+        const _BottomNavItem(
+          icon: Icons.leaderboard_outlined,
+          selectedIcon: Icons.leaderboard_rounded,
+          label: 'Ranking',
+        ),
+        const _BottomNavItem(
+          icon: Icons.favorite_border_rounded,
+          selectedIcon: Icons.favorite_rounded,
+          label: 'Observados',
+        ),
+        _BottomNavItem(
+          icon: Icons.chat_bubble_outline_rounded,
+          selectedIcon: Icons.chat_bubble_rounded,
+          label: 'Chat',
+          badgeCount: chatUnreadCount,
+        ),
+        const _BottomNavItem(
+          icon: Icons.settings_outlined,
+          selectedIcon: Icons.settings_rounded,
+          label: 'Conta',
+        ),
+      ];
+    }
+
+    return [
+      const _BottomNavItem(icon: Icons.home_rounded, label: 'Inicio'),
+      const _BottomNavItem(
+        icon: Icons.person_outline_rounded,
+        selectedIcon: Icons.person_rounded,
+        label: 'Perfil',
+      ),
+      const _BottomNavItem(
+        icon: Icons.leaderboard_outlined,
+        selectedIcon: Icons.leaderboard_rounded,
+        label: 'Ranking',
+      ),
+      _BottomNavItem(
+        icon: Icons.chat_bubble_outline_rounded,
+        selectedIcon: Icons.chat_bubble_rounded,
+        label: 'Chat',
+        badgeCount: chatUnreadCount,
+      ),
+      const _BottomNavItem(
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings_rounded,
+        label: 'Conta',
+      ),
+    ];
+  }
+
+  void _maybeNotifyUnread(
+    BuildContext context,
+    int unreadCount,
+    int chatIndex,
+  ) {
+    final previousUnreadCount = _lastUnreadCount;
+    _lastUnreadCount = unreadCount;
+
+    if (previousUnreadCount == null ||
+        unreadCount <= previousUnreadCount ||
+        _indiceAtual == chatIndex ||
+        chatIndex < 0) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _indiceAtual == chatIndex) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Nova mensagem no chat.'),
+          action: SnackBarAction(
+            label: 'Abrir',
+            onPressed: () => setState(() {
+              _indiceAtual = chatIndex;
+            }),
+          ),
+        ),
+      );
+    });
   }
 }
 
@@ -277,7 +334,12 @@ class _BottomNavButton extends StatelessWidget {
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 180),
                 opacity: selected ? 0 : 1,
-                child: Icon(item.icon, color: Colors.white, size: 22),
+                child: _NavIconWithBadge(
+                  icon: item.icon,
+                  badgeCount: item.badgeCount,
+                  color: Colors.white,
+                  size: 22,
+                ),
               ),
             ),
           ),
@@ -313,8 +375,74 @@ class _SelectedNavButton extends StatelessWidget {
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: onTap,
-            child: Icon(item.selectedIcon, color: AppColors.accent, size: 25),
+            child: Center(
+              child: _NavIconWithBadge(
+                icon: item.selectedIcon,
+                badgeCount: item.badgeCount,
+                color: AppColors.accent,
+                size: 25,
+              ),
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavIconWithBadge extends StatelessWidget {
+  const _NavIconWithBadge({
+    required this.icon,
+    required this.badgeCount,
+    required this.color,
+    required this.size,
+  });
+
+  final IconData icon;
+  final int badgeCount;
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon, color: color, size: size),
+        if (badgeCount > 0)
+          Positioned(
+            right: -10,
+            top: -10,
+            child: _NavBadge(count: badgeCount),
+          ),
+      ],
+    );
+  }
+}
+
+class _NavBadge extends StatelessWidget {
+  const _NavBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.redAccent,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFF050706), width: 1.5),
+      ),
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          height: 1,
         ),
       ),
     );
@@ -326,11 +454,13 @@ class _BottomNavItem {
     required this.icon,
     required this.label,
     IconData? selectedIcon,
+    this.badgeCount = 0,
   }) : selectedIcon = selectedIcon ?? icon;
 
   final IconData icon;
   final IconData selectedIcon;
   final String label;
+  final int badgeCount;
 }
 
 class _HomeLoadError extends StatelessWidget {

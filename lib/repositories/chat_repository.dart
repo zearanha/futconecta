@@ -7,6 +7,8 @@ class ChatConversation {
     required this.participantNames,
     required this.lastMessage,
     required this.lastSenderId,
+    required this.unreadCounts,
+    required this.typingUsers,
     required this.blockedBy,
     required this.updatedAt,
   });
@@ -16,6 +18,8 @@ class ChatConversation {
   final Map<String, String> participantNames;
   final String lastMessage;
   final String lastSenderId;
+  final Map<String, int> unreadCounts;
+  final List<String> typingUsers;
   final List<String> blockedBy;
   final DateTime? updatedAt;
 
@@ -30,6 +34,8 @@ class ChatConversation {
       ),
       lastMessage: data['lastMessage'] ?? '',
       lastSenderId: data['lastSenderId'] ?? '',
+      unreadCounts: _toIntMap(data['unreadCounts']),
+      typingUsers: List<String>.from(data['typingUsers'] ?? []),
       blockedBy: List<String>.from(data['blockedBy'] ?? []),
       updatedAt: _toDate(data['updatedAt']),
     );
@@ -54,6 +60,14 @@ class ChatConversation {
     final otherId = otherUserId(currentUserId);
     final name = participantNames[otherId] ?? '';
     return name.isEmpty ? 'Contato' : name;
+  }
+
+  int unreadCountFor(String userId) {
+    return unreadCounts[userId] ?? 0;
+  }
+
+  bool isTyping(String userId) {
+    return typingUsers.contains(userId);
   }
 }
 
@@ -193,6 +207,11 @@ class ChatRepository {
         },
         'lastMessage': trimmedText,
         'lastSenderId': senderId,
+        'unreadCounts': {
+          senderId: 0,
+          receiverId: FieldValue.increment(1),
+        },
+        'typingUsers': FieldValue.arrayRemove([senderId]),
         'updatedAt': now,
       };
       if (!chatSnapshot.exists ||
@@ -209,6 +228,33 @@ class ChatRepository {
         'sentAt': now,
       });
     });
+  }
+
+  Future<void> markConversationAsRead({
+    required String currentUserId,
+    required String receiverId,
+  }) async {
+    final chatId = conversationId(currentUserId, receiverId);
+    await _firestore.collection('chats').doc(chatId).set({
+      'unreadCounts': {currentUserId: 0},
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> setTyping({
+    required String currentUserId,
+    required String receiverId,
+    required bool isTyping,
+  }) async {
+    final chatId = conversationId(currentUserId, receiverId);
+    final chatRef = _firestore.collection('chats').doc(chatId);
+    final chatSnapshot = await chatRef.get();
+    if (!chatSnapshot.exists) return;
+
+    await chatRef.set({
+      'typingUsers': isTyping
+          ? FieldValue.arrayUnion([currentUserId])
+          : FieldValue.arrayRemove([currentUserId]),
+    }, SetOptions(merge: true));
   }
 
   Future<void> blockConversation({
@@ -250,6 +296,25 @@ class ChatRepository {
           return conversations;
         });
   }
+
+  Stream<int> watchUnreadCount(String userId) {
+    return watchConversations(userId).map(
+      (conversations) => conversations.fold<int>(
+        0,
+        (total, conversation) => total + conversation.unreadCountFor(userId),
+      ),
+    );
+  }
+}
+
+Map<String, int> _toIntMap(dynamic value) {
+  if (value is! Map) return const {};
+  return value.map((key, value) {
+    final count = value is num
+        ? value.toInt()
+        : int.tryParse(value?.toString() ?? '') ?? 0;
+    return MapEntry(key.toString(), count);
+  });
 }
 
 DateTime? _toDate(dynamic value) {
